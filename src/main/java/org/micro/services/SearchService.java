@@ -38,7 +38,6 @@ public class SearchService {
     	 */
     	//Calculating the time
     	long start = System.currentTimeMillis();
-    	
     	SearchServiceBean serachResponse=restTemplate.getForObject(String.format(Constant.SEARCH_SERVICE_END_POINT, term), SearchServiceBean.class);
     	
     	if(logger.isDebugEnabled()){

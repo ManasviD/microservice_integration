@@ -9,27 +9,30 @@ import java.util.concurrent.FutureTask;
 
 import org.apache.log4j.Logger;
 import org.micro.Constant;
-import org.micro.beans.ImageServiceBean;
+import org.micro.RestTemplateFactory;
 import org.micro.beans.ProductBean;
-import org.micro.beans.ReviewServiceBean;
 import org.micro.beans.SearchServiceBean;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+import org.springframework.cloud.netflix.hystrix.EnableHystrix;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
-
+import com.micro.async.ImageService;
+import com.micro.async.ReviewService;
+@Configuration
+@EnableAutoConfiguration
 @RestController
+@EnableHystrix
+@EnableDiscoveryClient
 public class AdvanceSearchService {
 	
 	final static Logger logger = Logger.getLogger(AdvanceSearchService.class);
 	
-	private RestTemplate restTemplate =restTemplate();
+	private RestTemplate restTemplate =RestTemplateFactory.restTemplate();
 	
 	private ExecutorService executor = Executors.newFixedThreadPool(Constant.THREAD_POOL_SIZE); 
 	
@@ -83,16 +86,14 @@ public class AdvanceSearchService {
     	 
     	return list;
     }
-    /**
-     *  Runnable for Image Service Call
-     * @author mdiksh
-     *
-     */
+    
      class ImageServiceTask implements Runnable{
     	
     	private String id;
     	
     	private ProductBean pb;
+
+    	private  ImageService imageService=new ImageService();
     	
     	public ImageServiceTask (String id, ProductBean pb)
     	{
@@ -104,8 +105,6 @@ public class AdvanceSearchService {
 			return id;
 		}
 
-
-
 		public void setId(String id) {
 			this.id = id;
 		}
@@ -113,11 +112,11 @@ public class AdvanceSearchService {
 		public void run() {
 			// TODO Auto-generated method stub
 			long imagestart= System.currentTimeMillis()-start;
-			ImageServiceBean imageResponse=restTemplate.getForObject(String.format(Constant.IMAGE_SERVICE_END_POINT, id), ImageServiceBean.class);
+			pb.setImage(imageService.getImage(this.id));
 			if(logger.isDebugEnabled()){
 			logger.debug("Image Service,"+imagestart+","+(System.currentTimeMillis()-start));
 			}
-			pb.setImage(imageResponse.getResults()[0].getUrl_fullxfull());
+			
 		}
     	
     	
@@ -132,6 +131,8 @@ public class AdvanceSearchService {
      	private String id;
      	
      	private ProductBean pb;
+        
+     	private ReviewService reviewService=new ReviewService();
      	
      	public ReviewServiceTask (String id, ProductBean pb)
      	{
@@ -148,16 +149,14 @@ public class AdvanceSearchService {
  		public void setId(String id) {
  			this.id = id;
  		}
-
+ 		
 		public void run() {
 			// TODO Auto-generated method stub
 			long reviewstart= System.currentTimeMillis()-start;
-			ReviewServiceBean reviewResponse=restTemplate.getForObject(String.format(Constant.REVIEW_SERVICE_END_POINT, id), ReviewServiceBean.class);
+			pb.setReviewCount(reviewService.getCount(this.id));
 			if(logger.isDebugEnabled()){	
 			logger.debug("Review Service,"+reviewstart+","+(System.currentTimeMillis()-start));
 			}
-			pb.setReviewCount(reviewResponse.getCount());
-			
 		}
      	
      	
@@ -186,24 +185,4 @@ public class AdvanceSearchService {
              }
          }
      }
-     
-     /**
- 	 * Need to override text/html to use JOSN Mapper
- 	 * 
- 	 * @return
- 	 */
- 	public RestTemplate restTemplate() {
- 	    RestTemplate restTemplate = new RestTemplate();
- 	    List<HttpMessageConverter<?>> converters = restTemplate.getMessageConverters();
- 	    for (HttpMessageConverter<?> converter : converters) {
- 	        if (converter instanceof MappingJackson2HttpMessageConverter) {
- 	            MappingJackson2HttpMessageConverter jsonConverter = (MappingJackson2HttpMessageConverter) converter;
- 	            jsonConverter.setObjectMapper(new ObjectMapper());
- 	            jsonConverter.setSupportedMediaTypes(ImmutableList.of(new MediaType("application", "json", MappingJackson2HttpMessageConverter.DEFAULT_CHARSET), new MediaType("text", "html", MappingJackson2HttpMessageConverter.DEFAULT_CHARSET)));
- 	        }
- 	    }
- 	    return restTemplate;
- 	}
-     
-
 }
